@@ -29,7 +29,7 @@ This is a fully decoupled, cloud-native application:
 *   **Frontend:** React (CDN), Tailwind CSS
 *   **Backend:** Python, FastAPI, Uvicorn, PyMuPDF
 *   **Database:** Supabase (PostgreSQL)
-*   **AI:** Google Gemini API (`gemini-1.5-flash`)
+*   **AI:** Google Gemini API
 *   **DevOps:** Render, Vercel, UptimeRobot
 
 ## Engineering Highlights & Challenges Solved
