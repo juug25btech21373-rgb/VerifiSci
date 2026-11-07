@@ -7,10 +7,15 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 app = FastAPI(title="VerifiSci API")
+
+# FIX: Explicitly allow your Vercel frontend to talk to this backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,  # Must be False if allow_origins is "*"
+    allow_origins=[
+        "https://verifisci-frontend.vercel.app", 
+        "http://localhost:8000"
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -19,8 +24,9 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
+# FIX: Using the stable 1.5-flash model
 GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-3.5-flash:generateContent?key=" + GEMINI_KEY)
+              "gemini-1.5-flash:generateContent?key=" + GEMINI_KEY)
 
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -38,6 +44,18 @@ ANALYSIS_SCHEMA = """Return ONLY valid JSON (no markdown fences) with exactly th
   "relatedWork": [{"title": "...", "why": "..."}]
 }
 Use "verified" only when the paper's own text fully supports the claim; use "mismatch" for anything the text contradicts or leaves unverifiable (put reason in "evidence"). If the paper has no experiments, fill with "not reported"."""
+
+# FIX: Restored the missing PDF extraction function
+def extract_pdf(raw: bytes) -> dict:
+    doc = fitz.open(stream=raw, filetype="pdf")
+    text = "\n".join(page.get_text() for page in doc)
+    return {"pages": len(doc), "text": text, "sha256": hashlib.sha256(raw).hexdigest()}
+
+# FIX: Restored the missing JSON parser
+def parse_json_loose(s: str) -> dict:
+    s = s.strip()
+    s = re.sub(r"^```(json)?|```$", "", s, flags=re.MULTILINE).strip()
+    return json.loads(s)
 
 def ask_llm(prompt: str, retries=3) -> str:
     if not GEMINI_KEY:
@@ -57,7 +75,6 @@ def ask_llm(prompt: str, retries=3) -> str:
                 time.sleep(wait_time)
                 continue
             
-            # If it's a different error (e.g., invalid key), fail immediately
             raise HTTPException(502, "LLM error %s: %s" % (r.status_code, r.text[:200]))
             
         except requests.exceptions.RequestException as e:
@@ -70,16 +87,18 @@ def ask_llm(prompt: str, retries=3) -> str:
 @app.post("/analyze")
 async def analyze(file: UploadFile):
     raw = await file.read()
-    if len(raw) > 20 * 1024 * 1024:
-        raise HTTPException(413, "PDF too large (max 20 MB)")
+    # FIX: Changed limit to 50 MB
+    if len(raw) > 50 * 1024 * 1024:
+        raise HTTPException(413, "PDF too large (max 50 MB)")
+    
     info = extract_pdf(raw)
     if len(info["text"].strip()) < 100:
         raise HTTPException(422, "No extractable text (scanned PDF?). OCR needed.")
+    
     prompt = ANALYSIS_SCHEMA + "\n\nPaper text (%d pages):\n" % info["pages"] + info["text"][:90000]
     analysis = parse_json_loose(ask_llm(prompt))
     paper_id = uuid.uuid4().hex[:12]
     
-    # Save to Supabase
     try:
         supabase.table("papers").insert({
             "id": paper_id,
