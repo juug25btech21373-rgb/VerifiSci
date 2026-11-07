@@ -1,4 +1,4 @@
-import os, json, re, hashlib, uuid, time, socket
+import os, json, re, hashlib, uuid, time, socket, random
 import requests
 import fitz  # PyMuPDF
 from fastapi import FastAPI, UploadFile, HTTPException
@@ -37,9 +37,9 @@ GEMINI_KEY = os.getenv("GEMINI_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
-# Using the stable 1.5-flash model (3.5 does not exist)
-GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-1.5-flash:generateContent?key=" + GEMINI_KEY)
+# The current stable model according to Google AI docs
+PRIMARY_MODEL = "gemini-3.8-flash" 
+FALLBACK_MODEL = "gemini-3.6-flash"
 
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -71,31 +71,45 @@ def parse_json_loose(s: str) -> dict:
     s = re.sub(r"^```(json)?|```$", "", s, flags=re.MULTILINE).strip()
     return json.loads(s)
 
-def ask_llm(prompt: str, retries=3) -> str:
+def ask_llm(prompt: str, retries=5) -> str:
     if not GEMINI_KEY:
         raise HTTPException(500, "GEMINI_API_KEY not set.")
     
-    for attempt in range(retries):
-        try:
-            r = requests.post(GEMINI_URL, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
-            
-            if r.status_code == 200:
-                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            
-            if r.status_code in [503, 429]:
-                wait_time = 5 * (attempt + 1)
-                print(f"Gemini API overloaded ({r.status_code}). Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-                continue
-            
-            raise HTTPException(502, "LLM error %s: %s" % (r.status_code, r.text[:200]))
-            
-        except requests.exceptions.RequestException as e:
-            if attempt == retries - 1:
-                raise HTTPException(502, f"Network error connecting to LLM: {str(e)}")
-            time.sleep(5)
-            
-    raise HTTPException(503, "The AI model is currently experiencing high demand. Please try again in a few minutes.")
+    # Try the primary model first, fallback if it fails completely
+    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL]
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
+        
+        for attempt in range(retries):
+            try:
+                r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
+                
+                if r.status_code == 200:
+                    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Handle Rate Limits (429) and Server Overload (503)
+                if r.status_code in [429, 503, 500]:
+                    # Exponential backoff with jitter
+                    base_delay = 2
+                    delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
+                    print(f"{model} busy ({r.status_code}). Retrying in {delay:.2f}s...")
+                    time.sleep(delay)
+                    continue
+                
+                # If it's a client error (400, 403, 404), fail immediately for this model
+                if r.status_code in [400, 403, 404]:
+                    print(f"{model} returned error {r.status_code}: {r.text[:200]}")
+                    break # Break inner loop, try next model
+                    
+            except requests.exceptions.RequestException as e:
+                if attempt == retries - 1:
+                    print(f"Network error on {model}: {str(e)}")
+                    break
+                time.sleep(5)
+                
+    # If both models fail after all retries
+    raise HTTPException(503, "The AI service is currently experiencing high demand. Please try again in a few minutes.")
 
 # ==========================================
 # 5. API ENDPOINTS
