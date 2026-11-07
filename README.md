@@ -17,3 +17,50 @@ Important – cold start: the backend is hosted on a free Render instance that g
 - Getting Started
 - Deployment
 - Known Limitations & Roadmap
+
+## Features
+
+- PDF ingestion – drag-and-drop or select a research paper PDF.
+- Structured analysis – automatically extracts:
+                        - Research domain
+                        - Dataset (name, size, source, splits, notes)
+                        - Models and versions
+                        - Experimental settings (optimizer, learning rate, batch size, epochs, seed, hardware)
+                        - Reported results with a match/mismatch status
+                        - Traceable evidence and a step-by-step reproducible workflow
+                        - Related work suggestions
+- Claim verification – every detected claim is labelled verified or mismatch, with its location in the paper and supporting evidence. Mismatches are listed in a dedicated panel.
+- Paper Assistant chat – ask questions about the paper; answers are grounded strictly in the paper's text with section citations, or the assistant replies NOT FOUND in this paper.
+- Save & export – save a project to the session list and export a text report of the claims.
+- Light/dark theme, responsive layout, toast notifications and a settings panel for the backend URL.
+- Resilient LLM calls – retries with exponential backoff and automatic model fallback.
+
+## Architecture
+
+┌──────────────────────────┐        HTTPS / JSON         ┌──────────────────────────────┐
+│  Frontend (Vercel)       │ ──────────────────────────▶ │  Backend (Render, FastAPI)   │
+│  React 18 + Tailwind     │   POST /analyze (PDF)       │                              │
+│  single-page index.html  │   POST /chat (question)     │  1. PyMuPDF text extraction  │
+└──────────────────────────┘ ◀────────────────────────── │  2. Prompt + Gemini API      │
+                                     JSON                │  3. Store/read via Supabase  │
+                                                         └──────────┬─────────┬─────────┘
+                                                                    │         │
+                                                       Google Gemini API   Supabase (Postgres)
+                                                       (generateContent)    `papers` table
+## Flow of an analysis
+- The user uploads a PDF in the browser.
+- The frontend sends it as multipart/form-data to POST /analyze.
+- The backend extracts the text with PyMuPDF, builds a prompt containing a strict JSON schema plus the paper text, and calls Gemini.
+- The JSON response is parsed, stored in Supabase together with the full text and SHA-256 hash, and returned to the client along with a paper_id.
+- For chat, the frontend sends paper_id + question to POST /chat; the backend loads the stored text and asks Gemini to answer only from it.
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 (UMD build + in-browser Babel), Tailwind CSS (CDN), Font Awesome, Source Sans 3 |
+| Backend | Python, FastAPI, Pydantic, Requests |
+| PDF parsing | PyMuPDF (`fitz`) |
+| LLM | Google Gemini via the REST `generateContent` endpoint |
+| Database | Supabase (PostgreSQL) |
+| Hosting | Vercel (frontend), Render (backend) |
