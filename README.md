@@ -133,14 +133,14 @@ The frontend is a single index.html using React via CDN and Babel standalone, so
 ## API Reference
 
 ## GET /health
-json
+```json
 { "ok": true, "llm": true, "database": true }
-
+```
 ## POST /analyze
 multipart/form-data with a file field (PDF).
 
 ## Response (200)
-json
+```json
 {
   "paper_id": "a1b2c3d4e5f6",
   "file_name": "paper.pdf",
@@ -155,13 +155,14 @@ json
   "claims": [{ "id": 1, "status": "verified", "text": "...", "location": "...", "evidence": "..." }],
   "relatedWork": [{ "title": "...", "why": "..." }]
 }
+```
 ## Errors
 413 file too large · 422 no extractable text · 500 database/config error · 503 LLM overloaded.
 
 ##POST /chat
-json
+```json
 { "paper_id": "a1b2c3d4e5f6", "question": "What dataset was used?" }
-
+```
 ## Response: 
 { "answer": "..." } · Errors: 404 paper not found · 500 database error · 503 LLM overloaded.
 
@@ -177,7 +178,7 @@ Supabase table papers:
 | `analysis` | jsonb | The structured analysis returned by the LLM |
 
 ## Example SQL:
-sql
+```sql
 create table papers (
   id text primary key,
   name text,
@@ -186,6 +187,7 @@ create table papers (
   analysis jsonb,
   created_at timestamptz default now()
 );
+```
 
 ## Getting Started
 ## Prerequisites
@@ -194,32 +196,36 @@ A Google Gemini API key
 A Supabase project with the papers table above
 
 ## Backend
-bash
+```bash
 git clone <your-repo-url>
 cd <your-repo>/backend
 
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install fastapi uvicorn[standard] python-multipart requests pymupdf supabase pydantic
+```
 
 ## Create the environment variables:
-
-bash
+```bash
 export GEMINI_API_KEY="your-gemini-key"
 export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_KEY="your-supabase-key"
+```
 
 ## Run:
-bash
+```bash
 uvicorn main:app --reload --port 8000
+```
 Check it works at http://localhost:8000/health.
 
 ## Frontend
 The frontend is static. Serve it with any static server:
 
 bash
+```bash
 cd frontend
 python -m http.server 5500
+```
 Open http://localhost:5500, sign in with any email/password, open Settings, and set the Backend API URL to http://localhost:8000.
 Add your local frontend origin (e.g. http://localhost:5500) to allow_origins in the backend's CORS configuration.
 
