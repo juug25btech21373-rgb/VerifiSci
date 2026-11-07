@@ -174,8 +174,8 @@
     function Dashboard({ user, onLogout }) {
       const [dark, setDark] = useState(false);
       
-      // IMPORTANT: Change this to your Render URL after deploying the backend!
-      const [apiUrl, setApiUrl] = useState("https://your-render-url-here.onrender.com");
+      // HERE IS THE UPDATED RENDER URL
+      const [apiUrl, setApiUrl] = useState("https://verifisci.onrender.com");
       const [currentPaperId, setCurrentPaperId] = useState(null);
 
       const [fileName, setFileName] = useState(null);
@@ -210,7 +210,6 @@
       const handleFile = (file) => {
         if (!file) return;
         
-        // NEW: Check file size (20MB limit)
         if (file.size > 20 * 1024 * 1024) {
           showToast("File is too large. Maximum size is 20 MB.", "error");
           return;
@@ -399,7 +398,6 @@
                             <p className="font-medium text-sm">{p.name}</p>
                             <p className="text-xs text-[var(--muted)]">{p.savedAt}</p>
                           </div>
-                          {/* FIX: Changed from a broken "Open" button to a status label */}
                           <span className="text-xs text-[var(--muted)] italic">Saved to database</span>
                         </div>
                       ))
@@ -429,7 +427,6 @@
 
                 {view === "main" && fileName && analysis && (
                   <>
-                    {/* Optional idea */}
                     <div className={card}>
                       <div className="px-4 py-3 border-b border-[var(--line)] text-sm font-semibold flex items-center gap-2">
                         <Lightbulb /> Your Research Idea <span className="text-xs font-normal text-[var(--muted)]">(optional)</span>
@@ -441,7 +438,6 @@
                       </div>
                     </div>
 
-                    {/* Overview */}
                     <div className={card}>
                       <div className="px-4 py-3 border-b border-[var(--line)]">
                         <h2 className="text-sm font-semibold uppercase">Paper Analysis Overview</h2>
@@ -511,7 +507,6 @@
                       </div>
                     </div>
 
-                    {/* Claims */}
                     <div className="grid gap-5 lg:grid-cols-2">
                       <div className={card}>
                         <div className="px-4 py-3 border-b border-[var(--line)] flex justify-between">
@@ -556,7 +551,6 @@
             </main>
           </div>
 
-          {/* Chat Panel */}
           {showChat && (
             <div className="fixed bottom-4 right-4 z-50 w-full max-w-md rounded-xl border border-[var(--line)] bg-[var(--panel)] shadow-2xl flex flex-col" style={{height: 460}}>
               <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
@@ -594,7 +588,6 @@
             </div>
           )}
 
-          {/* Modals */}
           {selectedClaim && (
             <Modal title={`Claim #${selectedClaim.id}`} onClose={() => setSelectedClaim(null)}>
               <p className="text-sm mb-2"><strong>Text:</strong> “{selectedClaim.text}”</p>
@@ -609,7 +602,7 @@
               <p className="text-sm mb-4">{user.name}<br/>{user.email}</p>
               <label className="block text-xs font-semibold uppercase text-[var(--muted)] mb-1">Backend API URL</label>
               <input value={apiUrl} onChange={e => setApiUrl(e.target.value)}
-                placeholder="https://your-render-url-here.onrender.com"
+                placeholder="https://verifisci.onrender.com"
                 className="w-full rounded-md border border-[var(--line)] bg-[var(--sunken)] px-3 py-2 text-sm mb-4 outline-none focus:border-[var(--sage)]" />
               <button onClick={() => setDark(d => !d)} className="w-full rounded-md bg-[var(--sunken)] py-2 text-sm mb-2">
                 Switch to {dark ? "Light" : "Dark"} Mode
