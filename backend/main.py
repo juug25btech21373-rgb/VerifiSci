@@ -26,7 +26,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 # FIX: Using the stable 1.5-flash model
 GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-1.5-flash:generateContent?key=" + GEMINI_KEY)
+              "gemini-3.5-flash:generateContent?key=" + GEMINI_KEY)
 
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
