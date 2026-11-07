@@ -5,6 +5,16 @@ from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from supabase import create_client, Client
+import socket
+
+@app.get("/test-dns")
+def test_dns():
+    try:
+        hostname = os.getenv("SUPABASE_URL", "").replace("https://", "").replace("http://", "").split("/")[0]
+        ip = socket.gethostbyname(hostname)
+        return {"ok": True, "ip": ip}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 app = FastAPI(title="VerifiSci API")
 
