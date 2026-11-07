@@ -1,4 +1,4 @@
-import os, json, re, hashlib, uuid
+import os, json, re, hashlib, uuid, time
 import requests
 import fitz  # PyMuPDF
 from fastapi import FastAPI, UploadFile, HTTPException
@@ -20,7 +20,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-3.8-flash:generateContent?key=" + GEMINI_KEY)
+              "gemini-3.5-flash:generateContent?key=" + GEMINI_KEY)
 
 if SUPABASE_URL and SUPABASE_KEY:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -39,23 +39,33 @@ ANALYSIS_SCHEMA = """Return ONLY valid JSON (no markdown fences) with exactly th
 }
 Use "verified" only when the paper's own text fully supports the claim; use "mismatch" for anything the text contradicts or leaves unverifiable (put reason in "evidence"). If the paper has no experiments, fill with "not reported"."""
 
-def ask_llm(prompt: str) -> str:
+def ask_llm(prompt: str, retries=3) -> str:
     if not GEMINI_KEY:
         raise HTTPException(500, "GEMINI_API_KEY not set.")
-    r = requests.post(GEMINI_URL, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
-    if r.status_code != 200:
-        raise HTTPException(502, "LLM error %s: %s" % (r.status_code, r.text[:200]))
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"]
-
-def extract_pdf(raw: bytes) -> dict:
-    doc = fitz.open(stream=raw, filetype="pdf")
-    text = "\n".join(page.get_text() for page in doc)
-    return {"pages": len(doc), "text": text, "sha256": hashlib.sha256(raw).hexdigest()}
-
-def parse_json_loose(s: str) -> dict:
-    s = s.strip()
-    s = re.sub(r"^```(json)?|```$", "", s, flags=re.MULTILINE).strip()
-    return json.loads(s)
+    
+    for attempt in range(retries):
+        try:
+            r = requests.post(GEMINI_URL, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
+            
+            if r.status_code == 200:
+                return r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            
+            # If 503 (High demand) or 429 (Rate limit), wait and retry
+            if r.status_code in [503, 429]:
+                wait_time = 5 * (attempt + 1)  # Wait 5s, then 10s, then 15s
+                print(f"Gemini API overloaded ({r.status_code}). Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+                continue
+            
+            # If it's a different error (e.g., invalid key), fail immediately
+            raise HTTPException(502, "LLM error %s: %s" % (r.status_code, r.text[:200]))
+            
+        except requests.exceptions.RequestException as e:
+            if attempt == retries - 1:
+                raise HTTPException(502, f"Network error connecting to LLM: {str(e)}")
+            time.sleep(5)
+            
+    raise HTTPException(503, "The AI model is currently experiencing high demand. Please try again in a few minutes.")
 
 @app.post("/analyze")
 async def analyze(file: UploadFile):
