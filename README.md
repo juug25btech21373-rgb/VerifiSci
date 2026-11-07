@@ -132,14 +132,14 @@ The frontend is a single index.html using React via CDN and Babel standalone, so
 
 ## API Reference
 
-## GET /health
+GET /health
 ```json
 { "ok": true, "llm": true, "database": true }
 ```
-## POST /analyze
+POST /analyze
 multipart/form-data with a file field (PDF).
 
-## Response (200)
+Response (200)
 ```json
 {
   "paper_id": "a1b2c3d4e5f6",
@@ -156,14 +156,14 @@ multipart/form-data with a file field (PDF).
   "relatedWork": [{ "title": "...", "why": "..." }]
 }
 ```
-## Errors
+Errors
 413 file too large · 422 no extractable text · 500 database/config error · 503 LLM overloaded.
 
-##POST /chat
+POST /chat
 ```json
 { "paper_id": "a1b2c3d4e5f6", "question": "What dataset was used?" }
 ```
-## Response: 
+Response: 
 { "answer": "..." } · Errors: 404 paper not found · 500 database error · 503 LLM overloaded.
 
 ## Data Model
@@ -177,7 +177,7 @@ Supabase table papers:
 | `text` | text | Full extracted text (used by `/chat`) |
 | `analysis` | jsonb | The structured analysis returned by the LLM |
 
-## Example SQL:
+Example SQL:
 ```sql
 create table papers (
   id text primary key,
@@ -195,7 +195,7 @@ Python 3.10+
 A Google Gemini API key
 A Supabase project with the papers table above
 
-## Backend
+Backend
 ```bash
 git clone <your-repo-url>
 cd <your-repo>/backend
@@ -205,20 +205,20 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install fastapi uvicorn[standard] python-multipart requests pymupdf supabase pydantic
 ```
 
-## Create the environment variables:
+Create the environment variables:
 ```bash
 export GEMINI_API_KEY="your-gemini-key"
 export SUPABASE_URL="https://your-project.supabase.co"
 export SUPABASE_KEY="your-supabase-key"
 ```
 
-## Run:
+Run:
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 Check it works at http://localhost:8000/health.
 
-## Frontend
+Frontend
 The frontend is static. Serve it with any static server:
 
 bash
