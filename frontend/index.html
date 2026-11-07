@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VerifiSci – Scientific Provenance</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Source Sans 3', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { margin: 0; font-family: 'Source Sans 3', sans-serif; }
+    .toast-enter { animation: slideIn 0.3s ease; }
+    @keyframes slideIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // ===== Icons =====
+    const Icon = ({ className }) => <i className={className}></i>;
+    const SearchIcon = () => <Icon className="fa-solid fa-magnifying-glass" />;
+    const Bell = () => <Icon className="fa-solid fa-bell" />;
+    const ChevronDown = () => <Icon className="fa-solid fa-chevron-down text-xs" />;
+    const PlusCircle = () => <Icon className="fa-solid fa-circle-plus" />;
+    const FolderOpen = () => <Icon className="fa-solid fa-folder-open" />;
+    const History = () => <Icon className="fa-solid fa-clock-rotate-left" />;
+    const ShieldCheck = () => <Icon className="fa-solid fa-shield-halved" />;
+    const Moon = () => <Icon className="fa-solid fa-moon" />;
+    const Sun = () => <Icon className="fa-solid fa-sun" />;
+    const Settings = () => <Icon className="fa-solid fa-gear" />;
+    const ChevronRight = () => <Icon className="fa-solid fa-chevron-right text-[10px]" />;
+    const Share2 = () => <Icon className="fa-solid fa-share-nodes" />;
+    const Lock = () => <Icon className="fa-solid fa-lock" />;
+    const FileUp = () => <Icon className="fa-solid fa-file-arrow-up" />;
+    const CheckCircle2 = () => <Icon className="fa-solid fa-circle-check" />;
+    const AlertTriangle = () => <Icon className="fa-solid fa-triangle-exclamation" />;
+    const Loader2 = () => <Icon className="fa-solid fa-spinner fa-spin" />;
+    const X = () => <Icon className="fa-solid fa-xmark" />;
+    const Upload = () => <Icon className="fa-solid fa-cloud-arrow-up" />;
+    const LogOut = () => <Icon className="fa-solid fa-right-from-bracket" />;
+    const User = () => <Icon className="fa-solid fa-user" />;
+    const Key = () => <Icon className="fa-solid fa-key" />;
+    const BookOpen = () => <Icon className="fa-solid fa-book-open" />;
+    const Save = () => <Icon className="fa-solid fa-floppy-disk" />;
+    const FilePdf = () => <Icon className="fa-solid fa-file-pdf" />;
+    const Database = () => <Icon className="fa-solid fa-database" />;
+    const CodeBranch = () => <Icon className="fa-solid fa-code-branch" />;
+    const Flask = () => <Icon className="fa-solid fa-flask" />;
+    const ChartLine = () => <Icon className="fa-solid fa-chart-line" />;
+    const LinkIcon = () => <Icon className="fa-solid fa-link" />;
+    const ListCheck = () => <Icon className="fa-solid fa-list-check" />;
+    const Lightbulb = () => <Icon className="fa-solid fa-lightbulb" />;
+    const Message = () => <Icon className="fa-solid fa-comments" />;
+    const Send = () => <Icon className="fa-solid fa-paper-plane" />;
+
+    // ===== Themes =====
+    const THEMES = {
+      light: {
+        "--bg": "#F4F2EE", "--panel": "#FFFFFF", "--sunken": "#ECEAE5", "--line": "#E4E1DB",
+        "--ink": "#1F2328", "--muted": "#6B6F73", "--sage": "#7A927B", "--sage-soft": "#DDE3D8",
+        "--charcoal": "#1B2030", "--good": "#1E9E55", "--warn": "#B7791F", "--warn-soft": "#FBF0D5",
+      },
+      dark: {
+        "--bg": "#16181B", "--panel": "#1E2126", "--sunken": "#272B31", "--line": "#33383F",
+        "--ink": "#ECEAE5", "--muted": "#9AA0A6", "--sage": "#8FA98F", "--sage-soft": "#2E3A2F",
+        "--charcoal": "#0E1016", "--good": "#3FBF7A", "--warn": "#E3A93B", "--warn-soft": "#3A3019",
+      },
+    };
+
+    const card = "rounded-md border border-[var(--line)] bg-[var(--panel)] shadow-sm";
+
+    // ===== Toast =====
+    function Toast({ message, type = "success", onClose }) {
+      useEffect(() => {
+        const t = setTimeout(onClose, 3500);
+        return () => clearTimeout(t);
+      }, []);
+      return (
+        <div className={`toast-enter fixed bottom-6 right-6 z-[100] flex items-center gap-3 rounded-lg px-5 py-3 shadow-lg text-sm font-medium
+          ${type === "success" ? "bg-[#1B2030] text-white" : "bg-red-600 text-white"}`}>
+          {type === "success" ? <CheckCircle2 /> : <AlertTriangle />}
+          <span>{message}</span>
+          <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100"><X /></button>
+        </div>
+      );
+    }
+
+    // ===== Login =====
+    function LoginScreen({ onLogin }) {
+      const [email, setEmail] = useState("");
+      const [password, setPassword] = useState("");
+      const [loading, setLoading] = useState(false);
+
+      const submit = (e) => {
+        e.preventDefault();
+        if (!email || !password) return;
+        setLoading(true);
+        setTimeout(() => {
+          onLogin({ name: email.split("@")[0] || "Researcher", email });
+          setLoading(false);
+        }, 600);
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F4F2EE] p-4">
+          <div className="w-full max-w-md rounded-xl border border-[#E4E1DB] bg-white p-8 shadow-lg">
+            <div className="flex flex-col items-center mb-8">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#7A927B] text-2xl font-bold text-white mb-3">V</div>
+              <h1 className="text-2xl font-semibold">VerifiSci</h1>
+              <p className="text-sm text-[#6B6F73] mt-1">Scientific Provenance Platform</p>
+              <p className="text-[11px] text-[#6B6F73] mt-2">Demo login — any email/password works</p>
+            </div>
+            <form onSubmit={submit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-[#6B6F73] mb-1.5">Email</label>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@university.edu"
+                  className="w-full rounded-md border border-[#E4E1DB] bg-[#F4F2EE] py-2.5 px-3 text-sm outline-none focus:border-[#7A927B]" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase text-[#6B6F73] mb-1.5">Password</label>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••"
+                  className="w-full rounded-md border border-[#E4E1DB] bg-[#F4F2EE] py-2.5 px-3 text-sm outline-none focus:border-[#7A927B]" />
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full rounded-md bg-[#1B2030] py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60 flex items-center justify-center gap-2">
+                {loading ? <><Loader2 /> Signing in…</> : "Sign In"}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== Modal =====
+    function Modal({ title, onClose, children }) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+          <div className="w-full max-w-lg rounded-xl border border-[var(--line)] bg-[var(--panel)] shadow-xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[var(--line)] px-6 py-4">
+              <h2 className="text-sm font-semibold uppercase">{title}</h2>
+              <button onClick={onClose}><X /></button>
+            </div>
+            <div className="p-6 overflow-y-auto">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    // ===== Main App =====
+    function Dashboard({ user, onLogout }) {
+      const [dark, setDark] = useState(false);
+      
+      // IMPORTANT: Change this to your Render URL after deploying the backend!
+      const [apiUrl, setApiUrl] = useState("https://your-render-url-here.onrender.com");
+      const [currentPaperId, setCurrentPaperId] = useState(null);
+
+      const [fileName, setFileName] = useState(null);
+      const [isUploading, setIsUploading] = useState(false);
+      const [isDragging, setIsDragging] = useState(false);
+      const [analysis, setAnalysis] = useState(null);
+      const [claims, setClaims] = useState([]);
+      const [userIdea, setUserIdea] = useState("");
+      const [savedProjects, setSavedProjects] = useState([]);
+      const [view, setView] = useState("main");
+      const [showSettings, setShowSettings] = useState(false);
+      const [showExport, setShowExport] = useState(false);
+      const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+      const [pendingLogout, setPendingLogout] = useState(false);
+      const [selectedClaim, setSelectedClaim] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [showChat, setShowChat] = useState(false);
+      
+      const [chatMessages, setChatMessages] = useState([
+        { role: "assistant", text: "Upload a paper and I will answer questions about its dataset, models, claims, and how to reproduce it." }
+      ]);
+      const [chatInput, setChatInput] = useState("");
+      const [chatThinking, setChatThinking] = useState(false);
+      const chatEndRef = useRef(null);
+
+      const showToast = (msg, type = "success") => setToast({ message: msg, type });
+
+      useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, [chatMessages]);
+
+      const handleFile = (file) => {
+        if (!file) return;
+        
+        // NEW: Check file size (20MB limit)
+        if (file.size > 20 * 1024 * 1024) {
+          showToast("File is too large. Maximum size is 20 MB.", "error");
+          return;
+        }
+
+        setIsUploading(true);
+        setFileName(file.name);
+        setView("main");
+        setAnalysis(null);
+        setClaims([]);
+
+        const form = new FormData();
+        form.append("file", file);
+        setChatMessages(prev => [...prev, { role: "assistant",
+          text: "Parsing the PDF and extracting claims with the LLM… this can take 30–90 seconds for a full paper." }]);
+        
+        fetch(apiUrl + "/analyze", { method: "POST", body: form })
+          .then(async r => {
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data.detail || ("Analysis failed (HTTP " + r.status + ")"));
+            return data;
+          })
+          .then(result => {
+            setCurrentPaperId(result.paper_id);
+            const mapped = {
+              domain: result.domain,
+              dataset: result.dataset,
+              modelVersions: result.models,
+              experimentalSettings: result.settings,
+              reportedResults: result.results,
+              traceableEvidence: result.evidence,
+              paperWorkflow: result.workflow,
+              claims: result.claims,
+              relatedWork: result.relatedWork,
+            };
+            setAnalysis(mapped);
+            setClaims(result.claims);
+            setIsUploading(false);
+            showToast(`Analysis ready for “${file.name}”`);
+            setChatMessages(prev => [...prev, {
+              role: "assistant",
+              text: `I finished analyzing “${file.name}”.\nDetected domain: ${result.domain}\nYou can now ask me about the dataset, models, claims, mismatches, or how to reproduce the experiments.`
+            }]);
+          })
+          .catch(err => {
+            setIsUploading(false);
+            showToast(String(err.message || err), "error");
+            setChatMessages(prev => [...prev, { role: "assistant",
+              text: "Backend error: " + String(err.message || err) + "\nCheck your API URL in Settings." }]);
+          });
+      };
+
+      const sendChat = () => {
+        if (!chatInput.trim()) return;
+        const q = chatInput.trim();
+        setChatMessages(prev => [...prev, { role: "user", text: q }]);
+        setChatInput("");
+        
+        if (!currentPaperId) {
+          setChatMessages(prev => [...prev, { role: "assistant",
+            text: "Please upload a paper first — my answers come from the paper's text via the backend." }]);
+          return;
+        }
+        
+        setChatThinking(true);
+        fetch(apiUrl + "/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paper_id: currentPaperId, question: q }),
+        })
+          .then(async r => {
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(data.detail || ("Chat failed (HTTP " + r.status + ")"));
+            return data;
+          })
+          .then(d => setChatMessages(prev => [...prev, { role: "assistant", text: d.answer }]))
+          .catch(err => setChatMessages(prev => [...prev, { role: "assistant",
+            text: "Backend unreachable: " + String(err.message || err) }]))
+          .finally(() => setChatThinking(false));
+      };
+
+      const saveProject = () => {
+        if (!fileName) return;
+        setSavedProjects(prev => [{
+          id: Date.now(),
+          name: fileName,
+          savedAt: new Date().toLocaleString(),
+          claims: claims.length
+        }, ...prev]);
+        setShowSaveConfirm(false);
+        showToast(`“${fileName}” saved`);
+        if (pendingLogout) {
+          setPendingLogout(false);
+          onLogout();
+        }
+      };
+
+      const requestLogout = () => {
+        if (fileName && !savedProjects.some(p => p.name === fileName)) {
+          setPendingLogout(true);
+          setShowSaveConfirm(true);
+        } else {
+          onLogout();
+        }
+      };
+
+      const doExport = () => {
+        if (!fileName || !analysis) {
+          showToast("Nothing to export", "error");
+          return;
+        }
+        const text = `VerifiSci Report\nFile: ${fileName}\nDomain: ${analysis.domain}\n\n` +
+          claims.map(c => `Claim #${c.id} [${c.status}]\n${c.text}\n${c.location}\n`).join("\n");
+        const blob = new Blob([text], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName.replace(/\.[^/.]+$/, "") + "_verifisci.txt";
+        a.click();
+        setShowExport(false);
+        showToast("Report exported");
+      };
+
+      const mismatched = claims.filter(c => c.status === "mismatch");
+
+      return (
+        <div style={THEMES[dark ? "dark" : "light"]} className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--ink)]">
+          {/* Header */}
+          <header className="flex h-14 items-center gap-4 border-b border-[var(--line)] bg-[var(--panel)] px-4">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--sage)] text-white font-bold">V</span>
+              <span className="font-semibold text-lg">VerifiSci</span>
+            </div>
+            <div className="ml-auto flex items-center gap-3">
+              <button onClick={() => setShowChat(true)} className="flex items-center gap-1.5 rounded-md bg-[var(--sage)] px-3 py-1.5 text-xs font-medium text-white">
+                <Message /> Chat
+              </button>
+              <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 text-sm">
+                <span className="hidden sm:inline">{user.name}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--sage-soft)] text-xs font-semibold">
+                  {user.name.slice(0,2).toUpperCase()}
+                </span>
+              </button>
+            </div>
+          </header>
+
+          <div className="flex flex-1">
+            {/* Sidebar */}
+            <aside className="hidden w-56 flex-col border-r border-[var(--line)] bg-[var(--bg)] p-3 md:flex">
+              <button onClick={() => { setView("main"); setFileName(null); setAnalysis(null); setClaims([]); setCurrentPaperId(null); }}
+                className="flex items-center gap-2 rounded-md bg-[var(--sage)] px-3 py-2 text-sm font-medium text-white mb-2">
+                <PlusCircle /> New Analysis
+              </button>
+              <button onClick={() => setView("projects")} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-[var(--sunken)]">
+                <FolderOpen /> Saved Projects
+              </button>
+              <div className="mt-auto pt-3 border-t border-[var(--line)]">
+                <button onClick={() => setDark(d => !d)} className="flex w-full items-center gap-2 px-3 py-2 text-sm">
+                  {dark ? <Sun /> : <Moon />} {dark ? "Light Mode" : "Dark Mode"}
+                </button>
+                <button onClick={() => setShowSettings(true)} className="flex w-full items-center gap-2 px-3 py-2 text-sm">
+                  <Settings /> Settings
+                </button>
+              </div>
+            </aside>
+
+            {/* Main */}
+            <main className="flex-1 flex flex-col min-w-0">
+              <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--panel)] px-5 py-2 text-xs">
+                <span className="text-[var(--muted)]">{fileName || "No paper uploaded"}</span>
+                <div className="flex gap-3">
+                  {fileName && <button onClick={() => setShowSaveConfirm(true)} className="flex items-center gap-1 hover:text-[var(--ink)]"><Save /> Save</button>}
+                  <button onClick={() => setShowExport(true)} className="flex items-center gap-1 hover:text-[var(--ink)]"><Share2 /> Export</button>
+                </div>
+              </div>
+
+              <div className="flex-1 p-5 overflow-y-auto space-y-5">
+                {view === "projects" && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-3">Saved Projects</h2>
+                    {savedProjects.length === 0 ? (
+                      <p className="text-[var(--muted)]">No projects saved yet.</p>
+                    ) : (
+                      savedProjects.map(p => (
+                        <div key={p.id} className="flex justify-between items-center border border-[var(--line)] rounded-md p-3 mb-2 bg-[var(--panel)]">
+                          <div>
+                            <p className="font-medium text-sm">{p.name}</p>
+                            <p className="text-xs text-[var(--muted)]">{p.savedAt}</p>
+                          </div>
+                          {/* FIX: Changed from a broken "Open" button to a status label */}
+                          <span className="text-xs text-[var(--muted)] italic">Saved to database</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {view === "main" && !fileName && (
+                  <div
+                    onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={e => { e.preventDefault(); setIsDragging(false); handleFile(e.dataTransfer.files[0]); }}
+                    className={`flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed py-20 text-center transition-colors
+                      ${isDragging ? "border-[var(--sage)] bg-[var(--sage-soft)]" : "border-[var(--muted)]/40 bg-[var(--panel)]"}`}
+                  >
+                    <div className="text-3xl text-[var(--muted)]">{isUploading ? <Loader2 /> : <FileUp />}</div>
+                    <h2 className="text-lg font-medium">{isUploading ? "Analyzing paper…" : "Upload a PDF to begin"}</h2>
+                    <p className="text-sm text-[var(--muted)]">Drag & drop or click to select (Max 20MB)</p>
+                    {!isUploading && (
+                      <label className="cursor-pointer rounded-md bg-[var(--sage)] px-5 py-2.5 text-sm font-medium text-white flex items-center gap-2">
+                        <Upload /> Select PDF
+                        <input type="file" accept=".pdf,application/pdf" className="hidden" onChange={e => handleFile(e.target.files[0])} />
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {view === "main" && fileName && analysis && (
+                  <>
+                    {/* Optional idea */}
+                    <div className={card}>
+                      <div className="px-4 py-3 border-b border-[var(--line)] text-sm font-semibold flex items-center gap-2">
+                        <Lightbulb /> Your Research Idea <span className="text-xs font-normal text-[var(--muted)]">(optional)</span>
+                      </div>
+                      <div className="p-4">
+                        <textarea value={userIdea} onChange={e => setUserIdea(e.target.value)} rows={2}
+                          placeholder="Optionally describe your idea. The analysis and workflow are generated from the paper automatically."
+                          className="w-full rounded-md border border-[var(--line)] bg-[var(--sunken)] px-3 py-2 text-sm outline-none focus:border-[var(--sage)]" />
+                      </div>
+                    </div>
+
+                    {/* Overview */}
+                    <div className={card}>
+                      <div className="px-4 py-3 border-b border-[var(--line)]">
+                        <h2 className="text-sm font-semibold uppercase">Paper Analysis Overview</h2>
+                        <p className="text-xs text-[var(--muted)] mt-0.5">{fileName} • {analysis.domain}</p>
+                      </div>
+                      <div className="p-4 grid gap-5 md:grid-cols-2">
+                        <div className="md:col-span-2">
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><BookOpen /> Related Work</h3>
+                          {analysis.relatedWork.map((r, i) => (
+                            <div key={i} className="bg-[var(--sunken)] rounded p-3 mb-2">
+                              <p className="text-sm font-medium">{r.title}</p>
+                              <p className="text-xs text-[var(--muted)] mt-1">{r.why}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><Database /> Dataset</h3>
+                          <p className="text-sm"><strong>{analysis.dataset.name}</strong></p>
+                          <p className="text-xs text-[var(--muted)]">{analysis.dataset.size} • {analysis.dataset.splits}</p>
+                          <p className="text-xs text-[var(--muted)]">{analysis.dataset.source}</p>
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><CodeBranch /> Models</h3>
+                          {analysis.modelVersions.map((m, i) => (
+                            <div key={i} className="flex justify-between text-sm bg-[var(--sunken)] rounded px-3 py-1.5 mb-1">
+                              <span>{m.name}</span>
+                              <span className="text-xs text-[var(--muted)]">{m.version}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><Flask /> Experimental Settings</h3>
+                          <div className="text-sm space-y-1">
+                            <p>Optimizer: <strong>{analysis.experimentalSettings.optimizer}</strong></p>
+                            <p>LR: <strong>{analysis.experimentalSettings.lr}</strong></p>
+                            <p>Batch / Epochs / Seed: <strong>{analysis.experimentalSettings.batch} / {analysis.experimentalSettings.epochs} / {analysis.experimentalSettings.seed}</strong></p>
+                            <p>Hardware: <strong>{analysis.experimentalSettings.hardware}</strong></p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><ChartLine /> Results</h3>
+                          <table className="w-full text-sm">
+                            <thead><tr className="text-xs text-[var(--muted)]"><th className="text-left pb-1">Metric</th><th className="text-left pb-1">Reported</th><th className="text-left pb-1">Reproduced</th><th className="text-left pb-1">Status</th></tr></thead>
+                            <tbody>
+                              {analysis.reportedResults.map((r, i) => (
+                                <tr key={i}>
+                                  <td className="py-1">{r.metric}</td>
+                                  <td>{r.reported}</td>
+                                  <td>{r.reproduced}</td>
+                                  <td>{r.status === "match" ? <span className="text-[var(--good)]">Match</span> : <span className="text-[var(--warn)]">Mismatch</span>}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <h3 className="text-xs font-semibold uppercase text-[var(--muted)] mb-2 flex items-center gap-1"><ListCheck /> Reproducible Workflow</h3>
+                          <ol className="list-decimal list-inside text-sm bg-[var(--sunken)] rounded p-4 space-y-1">
+                            {analysis.paperWorkflow.map((s, i) => <li key={i}>{s}</li>)}
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Claims */}
+                    <div className="grid gap-5 lg:grid-cols-2">
+                      <div className={card}>
+                        <div className="px-4 py-3 border-b border-[var(--line)] flex justify-between">
+                          <h2 className="text-sm font-semibold uppercase">Detected Claims</h2>
+                          <span className="text-xs text-[var(--muted)]">{claims.length}</span>
+                        </div>
+                        <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                          {claims.map(c => (
+                            <div key={c.id} onClick={() => setSelectedClaim(c)} className="border border-[var(--line)] rounded p-3 cursor-pointer hover:border-[var(--sage)] bg-[var(--bg)]">
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="font-semibold">Claim #{c.id}</span>
+                                {c.status === "verified" ? <span className="text-[var(--good)]">Verified</span> : <span className="text-[var(--warn)]">Mismatch</span>}
+                              </div>
+                              <p className="text-sm">{c.text}</p>
+                              <p className="text-xs text-[var(--muted)] mt-1">{c.location}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={card}>
+                        <div className="px-4 py-3 border-b border-[var(--line)] flex justify-between">
+                          <h2 className="text-sm font-semibold uppercase">Mismatched Claims</h2>
+                          <span className={`text-xs font-semibold ${mismatched.length ? "text-[var(--warn)]" : "text-[var(--good)]"}`}>{mismatched.length}</span>
+                        </div>
+                        <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                          {mismatched.length === 0 ? (
+                            <p className="text-sm text-[var(--muted)] text-center py-6">No mismatches found</p>
+                          ) : mismatched.map(c => (
+                            <div key={c.id} className="border border-[var(--warn)]/40 bg-[var(--warn-soft)] rounded p-3">
+                              <p className="text-sm font-medium">“{c.text}”</p>
+                              <p className="text-xs text-[var(--muted)] mt-1">{c.location}</p>
+                              <p className="text-xs mt-2 bg-[var(--panel)] rounded p-2">{c.mismatchDetail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </main>
+          </div>
+
+          {/* Chat Panel */}
+          {showChat && (
+            <div className="fixed bottom-4 right-4 z-50 w-full max-w-md rounded-xl border border-[var(--line)] bg-[var(--panel)] shadow-2xl flex flex-col" style={{height: 460}}>
+              <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+                <span className="text-sm font-semibold flex items-center gap-2"><Message /> Paper Assistant</span>
+                <button onClick={() => setShowChat(false)}><X /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {chatMessages.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-[var(--sage)] text-white" : "bg-[var(--sunken)]"}`}>
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {chatThinking && (
+                  <div className="flex justify-start">
+                    <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm bg-[var(--sunken)] text-[var(--muted)]">
+                      <Loader2 /> Thinking…
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+              <div className="border-t border-[var(--line)] p-3 flex gap-2">
+                <input
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && sendChat()}
+                  disabled={chatThinking}
+                  placeholder="Ask about dataset, claims, how to reproduce…"
+                  className="flex-1 rounded-md border border-[var(--line)] bg-[var(--sunken)] px-3 py-2 text-sm outline-none focus:border-[var(--sage)] disabled:opacity-50"
+                />
+                <button onClick={sendChat} disabled={chatThinking} className="rounded-md bg-[var(--sage)] px-3 py-2 text-white disabled:opacity-50"><Send /></button>
+              </div>
+            </div>
+          )}
+
+          {/* Modals */}
+          {selectedClaim && (
+            <Modal title={`Claim #${selectedClaim.id}`} onClose={() => setSelectedClaim(null)}>
+              <p className="text-sm mb-2"><strong>Text:</strong> “{selectedClaim.text}”</p>
+              <p className="text-sm mb-2"><strong>Location:</strong> {selectedClaim.location}</p>
+              <p className="text-sm mb-2"><strong>Evidence:</strong> {selectedClaim.evidence}</p>
+              {selectedClaim.mismatchDetail && <p className="text-sm text-[var(--warn)]"><strong>Mismatch reason:</strong> {selectedClaim.mismatchDetail}</p>}
+            </Modal>
+          )}
+
+          {showSettings && (
+            <Modal title="Settings" onClose={() => setShowSettings(false)}>
+              <p className="text-sm mb-4">{user.name}<br/>{user.email}</p>
+              <label className="block text-xs font-semibold uppercase text-[var(--muted)] mb-1">Backend API URL</label>
+              <input value={apiUrl} onChange={e => setApiUrl(e.target.value)}
+                placeholder="https://your-render-url-here.onrender.com"
+                className="w-full rounded-md border border-[var(--line)] bg-[var(--sunken)] px-3 py-2 text-sm mb-4 outline-none focus:border-[var(--sage)]" />
+              <button onClick={() => setDark(d => !d)} className="w-full rounded-md bg-[var(--sunken)] py-2 text-sm mb-2">
+                Switch to {dark ? "Light" : "Dark"} Mode
+              </button>
+              <button onClick={requestLogout} className="w-full rounded-md border border-red-300 bg-red-50 py-2 text-sm text-red-700">
+                Sign Out
+              </button>
+            </Modal>
+          )}
+
+          {showExport && (
+            <Modal title="Export Report" onClose={() => setShowExport(false)}>
+              <button onClick={doExport} className="w-full rounded-md border border-[var(--line)] py-3 text-sm hover:bg-[var(--sunken)] flex items-center justify-center gap-2">
+                <FilePdf /> Download as Text / PDF-ready
+              </button>
+            </Modal>
+          )}
+
+          {showSaveConfirm && (
+            <Modal title="Save Project?" onClose={() => { setShowSaveConfirm(false); setPendingLogout(false); }}>
+              <p className="text-sm mb-4">{pendingLogout ? "Save before signing out?" : `Save “${fileName}”?`}</p>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => { setShowSaveConfirm(false); if (pendingLogout) onLogout(); }} className="px-4 py-2 text-sm border rounded-md">Cancel</button>
+                <button onClick={saveProject} className="px-4 py-2 text-sm bg-[var(--sage)] text-white rounded-md">Save</button>
+              </div>
+            </Modal>
+          )}
+
+          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        </div>
+      );
+    }
+
+    function App() {
+      const [user, setUser] = useState(null);
+      if (!user) return <LoginScreen onLogin={setUser} />;
+      return <Dashboard user={user} onLogout={() => setUser(null)} />;
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
