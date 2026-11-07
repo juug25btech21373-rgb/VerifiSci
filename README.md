@@ -37,16 +37,16 @@ Important – cold start: the backend is hosted on a free Render instance that g
 
 ## Architecture
 
-┌──────────────────────────┐        HTTPS / JSON         ┌──────────────────────────────┐
-│  Frontend (Vercel)       │ ──────────────────────────▶ │  Backend (Render, FastAPI)   │
-│  React 18 + Tailwind     │   POST /analyze (PDF)       │                              │
-│  single-page index.html  │   POST /chat (question)     │  1. PyMuPDF text extraction  │
-└──────────────────────────┘ ◀────────────────────────── │  2. Prompt + Gemini API      │
-                                     JSON                │  3. Store/read via Supabase  │
-                                                         └──────────┬─────────┬─────────┘
-                                                                    │         │
-                                                       Google Gemini API   Supabase (Postgres)
-                                                       (generateContent)    `papers` table
+```mermaid
+flowchart LR
+    U([User]) --> F["Frontend<br/>React 18 + Tailwind<br/>Vercel"]
+    F -->|"POST /analyze (PDF)<br/>POST /chat (question)"| B["Backend<br/>FastAPI + PyMuPDF<br/>Render"]
+    B -->|"JSON response"| F
+    B -->|"Prompt via generateContent"| G["Google Gemini API"]
+    G -->|"Structured JSON / answer"| B
+    B -->|"Store / read papers table"| D[("Supabase<br/>PostgreSQL")]
+```
+
 ## Flow of an analysis
 - The user uploads a PDF in the browser.
 - The frontend sends it as multipart/form-data to POST /analyze.
